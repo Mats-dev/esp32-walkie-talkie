@@ -53,13 +53,17 @@ public:
   void add_samples(const uint8_t *samples, int count)
   {
     xSemaphoreTake(m_semaphore, portMAX_DELAY);
-    // copy the samples into the buffer wrapping around as needed
-    for (int i = 0; i < count; i++)
+    // check if there is still room in the buffer
+    if (m_available_samples + count <= m_buffer_size)
     {
-      m_buffer[m_write_head] = samples[i];
-      m_write_head = (m_write_head + 1) % m_buffer_size;
+      // copy the samples into the buffer wrapping around as needed
+      for (int i = 0; i < count; i++)
+      {
+        m_buffer[m_write_head] = samples[i];
+        m_write_head = (m_write_head + 1) % m_buffer_size;
+      }
+      m_available_samples += count;
     }
-    m_available_samples += count;
     xSemaphoreGive(m_semaphore);
   }
 
@@ -94,6 +98,16 @@ public:
         m_available_samples--;
       }
     }
+    xSemaphoreGive(m_semaphore);
+  }
+
+  void flush()
+  {
+    // flush all samples in the outputbuffer
+    xSemaphoreTake(m_semaphore, portMAX_DELAY);
+    m_read_head = 0;
+    m_write_head = 0;
+    m_available_samples = 0;
     xSemaphoreGive(m_semaphore);
   }
 };
